@@ -6,7 +6,7 @@ window.APN_CONFIG = {
   API_URL: "https://script.google.com/macros/s/AKfycbwSodmr7_J0HPWKPtzOcEfD-oRLj0xxgpYFMZAi2DtfYlLnMefs2tJpKettCOicNGo/exec",
 
   // Link de apn-reportes.js publicado en el repositorio "apn". Cambia TU_USUARIO por tu usuario de GitHub.
-  REPORTES_URL: "https://TU_USUARIO.github.io/apn/apn-reportes.js",
+  REPORTES_URL: "https://dania123456789123456-del.github.io/APN-REGISTROS/apn-reportes.js",
 
   // Videos de la pantalla de inicio y del login (link directo a un .mp4) y logo de la empresa
   VIDEO_INICIO_URL: "https://cdn.coverr.co/videos/coverr-city-traffic-at-night-1579/1080p.mp4",
