@@ -35,8 +35,8 @@
 const CFG = {
   TZ: 'America/Lima',
   ADMIN_USUARIO: 'admin',
-  ADMIN_CLAVE: 'CAMBIAME-123',   // solo se usa en setup()
-  PIN_INICIAL: '1234',           // solo se usa en setup()
+  ADMIN_CLAVE: 'admin',   // solo se usa en setup()
+  PIN_INICIAL: '123456',           // solo se usa en setup()
   TOKEN_DIAS: 30,
   DIAS_POR_DEFECTO: 62,          // cuántos días hacia atrás devuelve getData
   TURNOS: { dia: { ini: 7, fin: 19, nombre: 'DÍA' }, noche: { ini: 19, fin: 7, nombre: 'NOCHE' } }
