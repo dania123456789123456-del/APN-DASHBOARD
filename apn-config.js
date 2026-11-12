@@ -3,7 +3,7 @@
    ===================================================================== */
 window.APN_CONFIG = {
   // Link /exec de tu Apps Script (el mismo de los HTML de registro)
-  API_URL: "AQUI_VA_MI_LINK",
+  API_URL: "https://script.google.com/macros/s/AKfycbwSodmr7_J0HPWKPtzOcEfD-oRLj0xxgpYFMZAi2DtfYlLnMefs2tJpKettCOicNGo/exec",
 
   // Link de apn-reportes.js publicado en el repositorio "apn". Cambia TU_USUARIO por tu usuario de GitHub.
   REPORTES_URL: "https://TU_USUARIO.github.io/apn/apn-reportes.js",
