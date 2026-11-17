@@ -110,6 +110,8 @@ const ACCIONES = {
   getCuaderno:     { auth: 'any' },
   getCuadernos:    { auth: 'any' },
   verifyPin:       { auth: 'admin' },
+  updateMiRegistro: { auth: 'any', escribe: true },
+  deleteMiRegistro: { auth: 'any', escribe: true },
   updateRegistro:  { auth: 'admin', pin: true, escribe: true },
   deleteRegistro:  { auth: 'admin', pin: true, escribe: true },
   savePersona:     { auth: 'admin', escribe: true },
@@ -166,6 +168,7 @@ const EJECUTORES = {
     nombresHojas().filter(n => n.indexOf('reg_') === 0).forEach(n => {
       modulos[n.slice(4)] = leerTodo(n).filter(r => !esTrue(r.eliminado) && (!(r.fecha || r.fechaSalida) || String(r.fecha || r.fechaSalida) >= desde));
     });
+    ['personal', 'vehicular', 'visitas'].forEach(m => { modulos[m] = modulos[m] || []; });
     // Las salidas/retornos en vehículo cuentan también como salida/ingreso del conductor y de los pasajeros
     modulos.personal = (modulos.personal || []).filter(r => !r.derivado).concat(derivarPersonal(modulos.vehicular || []));
     return {
@@ -182,11 +185,10 @@ const EJECUTORES = {
   addRegistro: (d, user) => {
     const modulo = limpiarModulo(d.modulo);
     const reg = Object.assign({}, d.registro || {});
+    ['registradoPor', 'registradoPorId', 'creadoEn', 'eliminado', 'derivado', 'editadoPor', 'editadoEn'].forEach(k => { delete reg[k]; });   // los pone el servidor
     if (!reg.id) reg.id = 'r_' + idUnico();
-    reg.registradoPor = reg.registradoPor || user.nombre;
-    reg.registradoPorId = user.id;
-    reg.creadoEn = reg.creadoEn || ahora().texto;
-    upsert('reg_' + modulo, reg, 'id');   // upsert = reenviar lo mismo (cola sin conexión) NO duplica
+    // quién lo creó y cuándo se fija solo la PRIMERA vez; reenviar el mismo registro (cola sin conexión, retorno de un viaje) no lo cambia ni lo duplica
+    upsert('reg_' + modulo, reg, 'id', { registradoPor: user.nombre, registradoPorId: user.id, creadoEn: ahora().texto });
     return { status: 'success', id: reg.id };
   },
 
@@ -218,6 +220,35 @@ const EJECUTORES = {
   },
 
   verifyPin: (d) => ({ status: 'success' }),
+
+  // Corregir un registro propio desde los HTML de registro (el supervisor lo ve corregido en el dashboard)
+  updateMiRegistro: (d, user) => {
+    const modulo = limpiarModulo(d.modulo), hoja = 'reg_' + modulo, r = d.registro || {};
+    const antes = leerTodo(hoja).find(x => String(x.id) === String(r.id));
+    if (!antes || esTrue(antes.eliminado)) return { status: 'error', message: 'Ese registro ya no existe.' };
+    if (String(antes.registradoPorId) !== String(user.id)) return { status: 'error', message: 'Solo puedes corregir los registros que tú hiciste. Pide al supervisor que lo corrija desde el dashboard.' };
+    const PROTEGIDOS = ['id', 'registradoPor', 'registradoPorId', 'creadoEn', 'eliminado', 'derivado', 'editadoPor', 'editadoEn'];
+    const cambios = {}, nuevo = { id: antes.id };
+    Object.keys(r).forEach(k => {
+      if (PROTEGIDOS.indexOf(k) !== -1) return;
+      if (String(valorPlano(antes[k])) !== String(valorPlano(r[k]))) { cambios[k] = [antes[k], r[k]]; nuevo[k] = r[k]; }
+    });
+    if (!Object.keys(cambios).length) return { status: 'success', sinCambios: true };
+    nuevo.editadoPor = user.nombre; nuevo.editadoEn = ahora().texto;
+    upsert(hoja, nuevo, 'id');
+    registrarEdicion(user, modulo, antes.id, cambios);
+    return { status: 'success' };
+  },
+
+  deleteMiRegistro: (d, user) => {
+    const modulo = limpiarModulo(d.modulo), hoja = 'reg_' + modulo;
+    const antes = leerTodo(hoja).find(x => String(x.id) === String(d.id));
+    if (!antes || esTrue(antes.eliminado)) return { status: 'success', yaEliminado: true };
+    if (String(antes.registradoPorId) !== String(user.id)) return { status: 'error', message: 'Solo puedes eliminar los registros que tú hiciste. Pide al supervisor que lo elimine desde el dashboard.' };
+    upsert(hoja, { id: antes.id, eliminado: 'true', editadoPor: user.nombre, editadoEn: ahora().texto }, 'id');
+    registrarEdicion(user, modulo, antes.id, { eliminado: ['', 'true'] });
+    return { status: 'success' };
+  },
 
   updateRegistro: (d, user) => {
     const modulo = limpiarModulo(d.modulo);
@@ -634,9 +665,9 @@ function leerTodo(nombre) {
   });
 }
 
-function upsert(nombre, obj, clave) {
+function upsert(nombre, obj, clave, soloNuevo) {
   const s = hoja(nombre);
-  const enc = asegurarEncabezados(s, (COLUMNAS[nombre] || []).concat(Object.keys(obj)));
+  const enc = asegurarEncabezados(s, (COLUMNAS[nombre] || []).concat(Object.keys(obj), Object.keys(soloNuevo || {})));
   const total = s.getLastRow();
   const col = enc.indexOf(clave);
   let fila = -1, actual = {};
@@ -646,7 +677,7 @@ function upsert(nombre, obj, clave) {
       if (String(v[i][col]) === String(obj[clave])) { fila = i + 2; enc.forEach((k, j) => { actual[k] = v[i][j]; }); break; }
     }
   }
-  const final = Object.assign({}, actual, obj);
+  const final = fila > 0 ? Object.assign({}, actual, obj) : Object.assign({}, soloNuevo || {}, obj);
   const valores = enc.map(k => serializar(final[k]));
   const destino = fila > 0 ? fila : Math.max(total, 1) + 1;
   if (s.getMaxRows() < destino) s.insertRowsAfter(s.getMaxRows(), destino - s.getMaxRows());
